@@ -95,19 +95,19 @@ st.subheader("🗂 입출고 내역")
 filtered_df["날짜"] = pd.to_datetime(filtered_df["날짜"])
 st.dataframe(filtered_df.sort_values("날짜", ascending=False), use_container_width=True)
 
-# 엑셀 다운로드 (base64 방식 대체)
-st.subheader("📥 엑셀로 다운로드")
-def get_excel_download_link(df):
-    output = BytesIO()
-    writer = pd.ExcelWriter(output, engine='xlsxwriter')
-    df.to_excel(writer, index=False, sheet_name='입출고내역')
-    writer.save()
-    processed_data = output.getvalue()
-    b64 = base64.b64encode(processed_data).decode()
-    href = f'<a href="data:application/octet-stream;base64,{b64}" download="입출고내역.xlsx">엑셀 파일 다운로드</a>'
-    return href
+# 엑셀 다운로드 (csv 대체)
+st.subheader("📥 엑셀 다운로드 (CSV 형식)")
+@st.cache_data
+def convert_df(df):
+    return df.to_csv(index=False).encode('utf-8-sig')
 
-st.markdown(get_excel_download_link(filtered_df), unsafe_allow_html=True)
+csv_data = convert_df(filtered_df)
+st.download_button(
+    label="CSV 파일 다운로드",
+    data=csv_data,
+    file_name='입출고내역.csv',
+    mime='text/csv'
+)
 
 # 입출고 통계 시각화
 st.subheader("📊 입출고 통계 그래프")
