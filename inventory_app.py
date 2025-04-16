@@ -16,10 +16,10 @@ def load_data():
             st.session_state.inventory_df = df
             st.session_state.next_id = df["ID"].max() + 1
         else:
-            st.session_state.inventory_df = pd.DataFrame(columns=["ID", "날짜", "제품명", "컬러", "입출고", "수량"])
+            st.session_state.inventory_df = pd.DataFrame(columns=["ID", "날짜", "제품명", "코드", "컬러", "입출고", "수량"])
             st.session_state.next_id = 1
     else:
-        st.session_state.inventory_df = pd.DataFrame(columns=["ID", "날짜", "제품명", "컬러", "입출고", "수량"])
+        st.session_state.inventory_df = pd.DataFrame(columns=["ID", "날짜", "제품명", "코드", "컬러", "입출고", "수량"])
         st.session_state.next_id = 1
 
 # 데이터 저장
@@ -27,11 +27,12 @@ def save_data():
     st.session_state.inventory_df.to_csv(DATA_FILE, index=False)
 
 # 입출고 데이터 추가 함수
-def add_record(date, product, color, inout, qty):
+def add_record(date, product, code, color, inout, qty):
     new_row = {
         "ID": st.session_state.next_id,
         "날짜": date,
         "제품명": product,
+        "코드": code,
         "컬러": color,
         "입출고": inout,
         "수량": qty if inout == "입고" else -qty
@@ -46,8 +47,8 @@ def add_record(date, product, color, inout, qty):
 # 재고 집계 함수
 def calculate_stock():
     if st.session_state.inventory_df.empty:
-        return pd.DataFrame(columns=["제품명", "컬러", "재고"])
-    stock_df = st.session_state.inventory_df.groupby(["제품명", "컬러"])['수량'].sum().reset_index()
+        return pd.DataFrame(columns=["제품명", "코드", "컬러", "재고"])
+    stock_df = st.session_state.inventory_df.groupby(["제품명", "코드", "컬러"])["수량"].sum().reset_index()
     stock_df = stock_df.rename(columns={"수량": "재고"})
     return stock_df
 
@@ -59,16 +60,16 @@ load_data()
 # 제품명 클릭 후 입출고 기능
 st.subheader("📥 등록된 제품별 입출고")
 stock_df = calculate_stock()
-selected_product = st.selectbox("제품 선택", stock_df["제품명"] + " / " + stock_df["컬러"])
+selected_product = st.selectbox("제품 선택", stock_df["제품명"] + " / " + stock_df["코드"] + " / " + stock_df["컬러"])
 if selected_product:
-    pname, pcolor = selected_product.split(" / ")
+    pname, pcode, pcolor = selected_product.split(" / ")
     with st.form("선택 제품 입출고"):
         date2 = st.date_input("날짜", value=datetime.today(), key="altdate")
         inout2 = st.radio("입출고 구분", ["입고", "출고"], horizontal=True, key="altinout")
         qty2 = st.number_input("수량", min_value=1, step=1, key="altqty")
         submit_alt = st.form_submit_button("등록")
         if submit_alt:
-            add_record(date2.strftime("%Y-%m-%d"), pname, pcolor, inout2, qty2)
+            add_record(date2.strftime("%Y-%m-%d"), pname, pcode, pcolor, inout2, qty2)
             st.success(f"{pname} ({pcolor}) {inout2} {qty2}건 등록 완료")
 
 # 입력 폼
@@ -78,23 +79,28 @@ with st.form("입출고 등록"):
     with col1:
         date = st.date_input("날짜", value=datetime.today())
         product = st.text_input("제품명")
+        code = st.text_input("코드번호")
         color = st.text_input("컬러")
     with col2:
         inout = st.radio("입출고 구분", ["입고", "출고"], horizontal=True)
         qty = st.number_input("수량", min_value=1, step=1)
 
     submitted = st.form_submit_button("등록")
-    if submitted and product and color:
-        add_record(date.strftime("%Y-%m-%d"), product, color, inout, qty)
+    if submitted and product and color and code:
+        add_record(date.strftime("%Y-%m-%d"), product, code, color, inout, qty)
         st.success("입출고 정보가 등록되었습니다.")
 
 # 검색 기능
 st.subheader("🔍 제품 검색")
-search_term = st.text_input("검색할 제품명 또는 컬러")
+search_term = st.text_input("검색할 제품명, 코드 또는 컬러")
 
 filtered_df = st.session_state.inventory_df
 if search_term:
-    filtered_df = filtered_df[filtered_df["제품명"].str.contains(search_term, case=False) | filtered_df["컬러"].str.contains(search_term, case=False)]
+    filtered_df = filtered_df[
+        filtered_df["제품명"].str.contains(search_term, case=False) |
+        filtered_df["코드"].astype(str).str.contains(search_term, case=False) |
+        filtered_df["컬러"].str.contains(search_term, case=False)
+    ]
 
 # 현재 재고표 표시
 st.subheader("📦 현재 재고 현황")
