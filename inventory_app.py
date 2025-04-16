@@ -4,14 +4,27 @@ from datetime import datetime
 from io import BytesIO
 import base64
 import altair as alt
+import os
 
-# 초기 데이터프레임 생성 또는 세션 상태에서 로드
-def init_data():
-    if "inventory_df" not in st.session_state:
-        st.session_state.inventory_df = pd.DataFrame(columns=[
-            "ID", "날짜", "제품명", "컬러", "입출고", "수량"
-        ])
+DATA_FILE = "inventory_data.csv"
+
+# CSV에서 데이터 불러오기 또는 초기화
+def load_data():
+    if os.path.exists(DATA_FILE):
+        df = pd.read_csv(DATA_FILE)
+        if not df.empty:
+            st.session_state.inventory_df = df
+            st.session_state.next_id = df["ID"].max() + 1
+        else:
+            st.session_state.inventory_df = pd.DataFrame(columns=["ID", "날짜", "제품명", "컬러", "입출고", "수량"])
+            st.session_state.next_id = 1
+    else:
+        st.session_state.inventory_df = pd.DataFrame(columns=["ID", "날짜", "제품명", "컬러", "입출고", "수량"])
         st.session_state.next_id = 1
+
+# 데이터 저장
+def save_data():
+    st.session_state.inventory_df.to_csv(DATA_FILE, index=False)
 
 # 입출고 데이터 추가 함수
 def add_record(date, product, color, inout, qty):
@@ -28,6 +41,7 @@ def add_record(date, product, color, inout, qty):
         pd.DataFrame([new_row])
     ], ignore_index=True)
     st.session_state.next_id += 1
+    save_data()
 
 # 재고 집계 함수
 def calculate_stock():
@@ -37,19 +51,28 @@ def calculate_stock():
     stock_df = stock_df.rename(columns={"수량": "재고"})
     return stock_df
 
-# 수정 함수
-def update_record(record_id, new_product, new_color):
-    idx = st.session_state.inventory_df.index[st.session_state.inventory_df['ID'] == record_id].tolist()
-    if idx:
-        st.session_state.inventory_df.at[idx[0], "제품명"] = new_product
-        st.session_state.inventory_df.at[idx[0], "컬러"] = new_color
-
 # Streamlit 앱 시작
 st.title("CAMAFORCE 입출고 재고 관리")
 
-init_data()
+load_data()
+
+# 제품명 클릭 후 입출고 기능
+st.subheader("📥 등록된 제품별 입출고")
+stock_df = calculate_stock()
+selected_product = st.selectbox("제품 선택", stock_df["제품명"] + " / " + stock_df["컬러"])
+if selected_product:
+    pname, pcolor = selected_product.split(" / ")
+    with st.form("선택 제품 입출고"):
+        date2 = st.date_input("날짜", value=datetime.today(), key="altdate")
+        inout2 = st.radio("입출고 구분", ["입고", "출고"], horizontal=True, key="altinout")
+        qty2 = st.number_input("수량", min_value=1, step=1, key="altqty")
+        submit_alt = st.form_submit_button("등록")
+        if submit_alt:
+            add_record(date2.strftime("%Y-%m-%d"), pname, pcolor, inout2, qty2)
+            st.success(f"{pname} ({pcolor}) {inout2} {qty2}건 등록 완료")
 
 # 입력 폼
+st.subheader("📝 신규 입출고 등록")
 with st.form("입출고 등록"):
     col1, col2 = st.columns(2)
     with col1:
@@ -73,22 +96,8 @@ filtered_df = st.session_state.inventory_df
 if search_term:
     filtered_df = filtered_df[filtered_df["제품명"].str.contains(search_term, case=False) | filtered_df["컬러"].str.contains(search_term, case=False)]
 
-# 수정 기능
-st.subheader("✏️ 제품명 및 컬러 수정")
-with st.expander("수정할 항목 선택"):
-    selected_id = st.selectbox("수정할 ID 선택", st.session_state.inventory_df["ID"].tolist())
-    new_product = st.text_input("새 제품명")
-    new_color = st.text_input("새 컬러")
-    if st.button("수정하기"):
-        if new_product and new_color:
-            update_record(selected_id, new_product, new_color)
-            st.success(f"ID {selected_id} 수정 완료")
-        else:
-            st.warning("제품명과 컬러를 모두 입력해주세요.")
-
 # 현재 재고표 표시
 st.subheader("📦 현재 재고 현황")
-stock_df = calculate_stock()
 st.dataframe(stock_df, use_container_width=True)
 
 # 전체 입출고 내역 표시
