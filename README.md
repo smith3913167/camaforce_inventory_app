@@ -1,0 +1,1 @@
+# camaforce_inventory_app
