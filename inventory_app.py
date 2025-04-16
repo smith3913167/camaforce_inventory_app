@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 from io import BytesIO
 import base64
+import altair as alt
 
 # 초기 데이터프레임 생성 또는 세션 상태에서 로드
 def init_data():
@@ -109,18 +110,21 @@ st.download_button(
     mime='text/csv'
 )
 
-# 입출고 통계 시각화
+# 입출고 통계 시각화 (Altair 대체)
 st.subheader("📊 입출고 통계 그래프")
 graph_df = st.session_state.inventory_df.copy()
 graph_df["월"] = pd.to_datetime(graph_df["날짜"]).dt.to_period("M").astype(str)
 summary = graph_df.groupby(["월", "입출고"])["수량"].sum().reset_index()
 
-import matplotlib.pyplot as plt
-import seaborn as sns
+chart = alt.Chart(summary).mark_bar().encode(
+    x='월:N',
+    y='수량:Q',
+    color='입출고:N',
+    tooltip=['월', '입출고', '수량']
+).properties(
+    width=700,
+    height=400,
+    title="월별 입출고 수량"
+)
 
-plt.figure(figsize=(10, 4))
-sns.barplot(data=summary, x="월", y="수량", hue="입출고")
-plt.xticks(rotation=45)
-plt.title("월별 입출고 수량")
-st.pyplot(plt)
-
+st.altair_chart(chart, use_container_width=True)
