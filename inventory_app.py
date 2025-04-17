@@ -85,6 +85,7 @@ if selected_product:
         if submit_alt:
             add_record(date2.strftime("%Y-%m-%d"), catname, sname, pname, fname, pcode, pcolor, store_id, inout2, qty2, memo2)
             st.success(f"{pname} ({pcolor}) {inout2} {qty2}건 등록 완료")
+    st.markdown(f"🔗 [스마트스토어 상품 페이지로 이동](https://smartstore.naver.com/{store_id})")
 
 # 입력 폼
 st.subheader("📝 신규 입출고 등록")
@@ -127,7 +128,6 @@ if search_term:
 # 현재 재고표 표시
 st.subheader("📦 현재 재고 현황")
 
-# 재고가 15개 이하인 항목 빨간색 경고 표시
 styled_stock_df = stock_df.style.applymap(
     lambda val: 'color: red; font-weight: bold;' if isinstance(val, (int, float)) and val <= 15 else '',
     subset=["재고"]
@@ -158,6 +158,14 @@ chart = alt.Chart(summary).mark_bar().encode(
 )
 
 st.altair_chart(chart, use_container_width=True)
+
+# 📉 월별 재고 15개 이하 제품 모아보기
+st.subheader("🚨 월별 안전재고 미만 제품")
+monthly_df = graph_df.groupby(["월", "제품명"])["수량"].sum().reset_index()
+latest_month = graph_df["월"].max()
+latest_stock = calculate_stock()
+safe_items = latest_stock[latest_stock["재고"] <= 15]
+st.dataframe(safe_items, use_container_width=True)
 
 # 엑셀 다운로드
 st.subheader("📥 엑셀 다운로드 (CSV 형식)")
