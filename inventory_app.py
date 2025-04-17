@@ -27,125 +27,99 @@ def load_data():
 def save_data():
     st.session_state.inventory_df.to_csv(DATA_FILE, index=False)
 
-# 수정 이력 저장 함수
-def log_history(action, record):
-    record["이력"] = action
-    history_df = pd.DataFrame([record])
-    if os.path.exists(HISTORY_FILE):
-        history_df.to_csv(HISTORY_FILE, mode='a', index=False, header=False)
-    else:
-        history_df.to_csv(HISTORY_FILE, index=False)
-
-# 입출고 데이터 수정 함수
-def update_record(record_id, updated_row):
-    df = st.session_state.inventory_df
-    index = df[df["ID"] == record_id].index
-    if not index.empty:
-        original = df.loc[index[0]].to_dict()
-        log_history("수정 전", original)
-        for key in updated_row:
-            df.at[index[0], key] = updated_row[key]
-        save_data()
-        log_history("수정 후", df.loc[index[0]].to_dict())
-
-# 입출고 데이터 삭제 함수
-def delete_record(record_id):
-    df = st.session_state.inventory_df
-    deleted = df[df["ID"] == record_id].iloc[0].to_dict()
-    log_history("삭제", deleted)
-    st.session_state.last_deleted = deleted
-    st.session_state.inventory_df = df[df["ID"] != record_id].reset_index(drop=True)
-    save_data()
-
-# 삭제 취소 함수
-def undo_delete():
-    if "last_deleted" in st.session_state:
-        restored = st.session_state.last_deleted
-        st.session_state.inventory_df = pd.concat([
-            st.session_state.inventory_df,
-            pd.DataFrame([restored])
-        ], ignore_index=True).sort_values("ID").reset_index(drop=True)
-        save_data()
-        st.success("삭제 취소 완료")
-        del st.session_state.last_deleted
-
-# 기존 내용 불러오기
+# 기존 데이터 불러오기
 load_data()
 
-# 좌우 영역으로 UI 정리
-col_left, col_right = st.columns([1.2, 2])
+# 좌측 컬럼: 제품 등록 및 입고/출고 입력
+col1, col2 = st.columns([1, 2])
 
-# 왼쪽 영역 (입력 중심)
-with col_left:
-    with st.expander("📋 제품 신규 등록 및 입출고 등록", expanded=True):
-        st.subheader("✏️ 제품 정보 수정 및 삭제")
-        edit_df = st.session_state.inventory_df.copy()
-        selected_edit_id = st.selectbox("수정 또는 삭제할 제품 ID", options=edit_df["ID"].tolist())
-        edit_row = edit_df[edit_df["ID"] == selected_edit_id].iloc[0]
+with col1:
+    st.subheader("📦 제품 신규 등록")
+    with st.form("register_form"):
+        r_date = st.date_input("날짜", value=datetime.today())
+        r_category = st.text_input("카테고리")
+        r_series = st.text_input("시리즈명")
+        r_product = st.text_input("제품명")
+        r_feature = st.text_input("특징")
+        r_code = st.text_input("코드번호")
+        r_color = st.text_input("컬러")
+        r_store = st.text_input("스마트스토어 상품번호")
+        r_inout = st.radio("입출고", ["입고", "출고"], horizontal=True)
+        r_qty = st.number_input("수량", min_value=1, step=1)
+        r_memo = st.text_input("메모")
+        submitted = st.form_submit_button("등록")
 
-        with st.form("수정폼"):
-            new_date = st.date_input("날짜", value=pd.to_datetime(edit_row["날짜"]))
-            new_category = st.text_input("카테고리", value=edit_row["카테고리"])
-            new_series = st.text_input("시리즈명", value=edit_row["시리즈명"])
-            new_product = st.text_input("제품명", value=edit_row["제품명"])
-            new_feature = st.text_input("특징", value=edit_row["특징"])
-            new_store_id = st.text_input("스마트스토어 상품번호", value=str(edit_row["스마트스토어번호"]))
-            new_code = st.text_input("코드번호", value=str(edit_row["코드"]))
-            new_color = st.text_input("컬러", value=edit_row["컬러"])
-            new_inout = st.selectbox("입출고", ["입고", "출고"], index=0 if edit_row["입출고"] == "입고" else 1)
-            new_qty = st.number_input("수량", min_value=1, step=1, value=abs(int(edit_row["수량"])))
-            new_memo = st.text_input("메모", value=edit_row["메모"])
+        if submitted:
+            new_row = {
+                "ID": st.session_state.next_id,
+                "날짜": r_date.strftime("%Y-%m-%d"),
+                "카테고리": r_category,
+                "시리즈명": r_series,
+                "제품명": r_product,
+                "특징": r_feature,
+                "코드": r_code,
+                "컬러": r_color,
+                "스마트스토어번호": r_store,
+                "입출고": r_inout,
+                "수량": r_qty if r_inout == "입고" else -r_qty,
+                "메모": r_memo
+            }
+            st.session_state.inventory_df = pd.concat([
+                st.session_state.inventory_df,
+                pd.DataFrame([new_row])
+            ], ignore_index=True)
+            st.session_state.next_id += 1
+            save_data()
+            st.success("제품이 등록되었습니다.")
 
-            col3, col4 = st.columns(2)
-            with col3:
-                if st.form_submit_button("수정하기"):
-                    update_record(selected_edit_id, {
-                        "날짜": new_date.strftime("%Y-%m-%d"),
-                        "카테고리": new_category,
-                        "시리즈명": new_series,
-                        "제품명": new_product,
-                        "특징": new_feature,
-                        "코드": new_code,
-                        "컬러": new_color,
-                        "스마트스토어번호": new_store_id,
-                        "입출고": new_inout,
-                        "수량": new_qty if new_inout == "입고" else -new_qty,
-                        "메모": new_memo
-                    })
-                    st.success("수정 완료")
+    st.subheader("📋 등록된 제품 입고/출고")
+    if not st.session_state.inventory_df.empty:
+        grouped = st.session_state.inventory_df.groupby(["시리즈명", "제품명", "컬러"])["수량"].sum().reset_index()
+        product_options = grouped.apply(lambda row: f"{row['시리즈명']} - {row['제품명']} ({row['컬러']})", axis=1).tolist()
+        selected_product = st.selectbox("제품 선택", product_options)
 
-            with col4:
-                if st.form_submit_button("삭제하기"):
-                    delete_record(selected_edit_id)
-                    st.warning("삭제 완료")
+        if selected_product:
+            selected = grouped.iloc[product_options.index(selected_product)]
+            with st.form("inout_form"):
+                io_date = st.date_input("날짜", value=datetime.today(), key="inout_date")
+                io_inout = st.radio("입출고", ["입고", "출고"], horizontal=True, key="inout_type")
+                io_qty = st.number_input("수량", min_value=1, step=1, key="inout_qty")
+                io_memo = st.text_input("메모", key="inout_memo")
+                submit_io = st.form_submit_button("입출고 등록")
 
-        if "last_deleted" in st.session_state:
-            if st.button("⏪ 삭제 취소(Undo)"):
-                undo_delete()
+                if submit_io:
+                    new_io = {
+                        "ID": st.session_state.next_id,
+                        "날짜": io_date.strftime("%Y-%m-%d"),
+                        "카테고리": '',
+                        "시리즈명": selected["시리즈명"],
+                        "제품명": selected["제품명"],
+                        "특징": '',
+                        "코드": '',
+                        "컬러": selected["컬러"],
+                        "스마트스토어번호": '',
+                        "입출고": io_inout,
+                        "수량": io_qty if io_inout == "입고" else -io_qty,
+                        "메모": io_memo
+                    }
+                    st.session_state.inventory_df = pd.concat([
+                        st.session_state.inventory_df,
+                        pd.DataFrame([new_io])
+                    ], ignore_index=True)
+                    st.session_state.next_id += 1
+                    save_data()
+                    st.success("입출고 정보가 등록되었습니다.")
 
-# 오른쪽 영역 (시각화 중심)
-with col_right:
-    st.markdown("### 📦 현재 재고 현황")
-    df = st.session_state.inventory_df.copy()
-    if df.empty:
-        st.info("등록된 제품이 없습니다.")
-    else:
-        df["날짜"] = pd.to_datetime(df["날짜"])
-        stock_df = df.groupby(["카테고리", "제품명"])["수량"].sum().reset_index()
+with col2:
+    st.subheader("📦 현재 재고 현황")
+    if not st.session_state.inventory_df.empty:
+        stock_df = st.session_state.inventory_df.groupby(["시리즈명", "제품명", "컬러"])["수량"].sum().reset_index()
         stock_df = stock_df.rename(columns={"수량": "재고"})
-        st.dataframe(stock_df, use_container_width=True)
 
-        st.markdown("### 📊 월별 입출고 비교")
-        df["월"] = df["날짜"].dt.to_period("M").astype(str)
-        summary = df.groupby(["월", "입출고"])["수량"].sum().reset_index()
-        chart = alt.Chart(summary).mark_bar().encode(
-            x='월:N',
-            y='sum(수량):Q',
-            color='입출고:N',
-            tooltip=['월', '입출고', '수량']
-        ).properties(
-            width=700,
-            height=400,
-            title="월별 입출고 비교"
-        )
-        st.altair_chart(chart, use_container_width=True)
+        def highlight_low_stock(val):
+            return 'color: red; font-weight: bold;' if isinstance(val, (int, float)) and val < 15 else ''
+
+        styled_stock_df = stock_df.style.applymap(highlight_low_stock, subset=["재고"])
+        st.dataframe(styled_stock_df, use_container_width=True)
+    else:
+        st.info("재고 데이터가 없습니다.")
