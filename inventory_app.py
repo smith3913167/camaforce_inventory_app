@@ -143,7 +143,8 @@ with tabs[1]:
         st.subheader("📋 제품별 누적 재고 리스트")
         item_df = df.groupby(["시리즈명", "제품명", "컬러"]).agg({"수량": "sum"}).reset_index()
         item_df = item_df.rename(columns={"수량": "총재고"})
-        item_df["총재고"] = item_df["총재고"].astype(int)
+        item_df["총재고"] = item_df["총재고"].fillna(0).astype(int)
+
         st.dataframe(item_df, use_container_width=True)
 
     else:
