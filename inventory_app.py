@@ -7,7 +7,7 @@ import altair as alt
 import os
 from supabase import create_client, Client
 
-# 🔐 Supabase 설정 (여기에 본인의 프로젝트 URL과 서비스 키 입력)
+# 🔐 Supabase 설정
 SUPABASE_URL = "https://ibotdnvtdlmmcrqtfsgx.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlib3RkbnZ0ZGxtbWNycXRmc2d4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NTIyNDk3MywiZXhwIjoyMDYwODAwOTczfQ.C2ndSZGaNTeEAdzKTb8X9hr19Rokqy8obqgb33oq0aE"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -25,11 +25,10 @@ def load_data():
         st.session_state.next_id = 1
 
 # Supabase에 데이터 저장
-def save_data():
-    latest = st.session_state.inventory_df.iloc[-1].to_dict()
-    supabase.table("inventory").insert(latest).execute()
+def save_data(row):
+    supabase.table("inventory").insert(row).execute()
 
-# 자동 저장
+# 자동 저장 설정
 if "autosave" not in st.session_state:
     st.session_state.autosave = True
 
@@ -40,7 +39,7 @@ st.title("CAMAFORCE 입출고 재고 관리")
 # 탭 UI 구성
 tabs = st.tabs(["📦 제품 등록 및 입출고", "📊 재고 현황 및 통계"])
 
-# 첫 번째 탭: 제품 등록 및 입출고
+# 첫 번째 탭
 with tabs[0]:
     with st.expander("➕ 제품 신규 등록", expanded=True):
         with st.form("register_form"):
@@ -78,7 +77,7 @@ with tabs[0]:
                 ], ignore_index=True)
                 st.session_state.next_id += 1
                 if st.session_state.autosave:
-                    save_data()
+                    save_data(new_row)
                 st.success("제품이 등록되었습니다.")
 
     with st.expander("📥 등록된 제품 입고/출고 등록", expanded=True):
@@ -117,5 +116,41 @@ with tabs[0]:
                         ], ignore_index=True)
                         st.session_state.next_id += 1
                         if st.session_state.autosave:
-                            save_data()
+                            save_data(new_io)
                         st.success("입출고 정보가 등록되었습니다.")
+
+# 두 번째 탭: 재고 및 통계
+with tabs[1]:
+    st.subheader("📦 현재 재고 현황")
+    if not st.session_state.inventory_df.empty:
+        stock_df = st.session_state.inventory_df.groupby(["시리즈명", "제품명", "컬러", "스마트스토어번호"])["수량"].sum().reset_index()
+        stock_df = stock_df.rename(columns={"수량": "재고"})
+
+        def highlight_low_stock(val):
+            return 'color: red; font-weight: bold;' if isinstance(val, (int, float)) and val < 15 else ''
+
+        styled_stock_df = stock_df.style.applymap(highlight_low_stock, subset=["재고"])
+        st.dataframe(styled_stock_df, use_container_width=True)
+
+        st.markdown("\n**📎 스마트스토어 상품 링크 자동 연결:**")
+        for _, row in stock_df.iterrows():
+            if str(row["스마트스토어번호"]).strip():
+                st.markdown(f"[{row['제품명']} ({row['컬러']}) 링크 열기](https://smartstore.naver.com/{row['스마트스토어번호']})")
+
+        st.subheader("📊 월별 입출고 비교")
+        df = st.session_state.inventory_df.copy()
+        df["월"] = pd.to_datetime(df["날짜"]).dt.to_period("M").astype(str)
+        summary = df.groupby(["월", "입출고"])["수량"].sum().reset_index()
+        chart = alt.Chart(summary).mark_bar().encode(
+            x='월:N',
+            y='sum(수량):Q',
+            color='입출고:N',
+            tooltip=['월', '입출고', '수량']
+        ).properties(
+            width=700,
+            height=400,
+            title="월별 입출고 비교"
+        )
+        st.altair_chart(chart, use_container_width=True)
+    else:
+        st.info("재고 데이터가 없습니다.")
