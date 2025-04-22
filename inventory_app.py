@@ -41,7 +41,44 @@ tabs = st.tabs(["📦 제품 등록 및 입출고", "📊 재고 현황 및 통�
 
 # 첫 번째 탭
 with tabs[0]:
-    ...
+    st.subheader("📦 제품 등록")
+    with st.form("register_form"):
+        r_date = st.date_input("날짜", value=datetime.today())
+        r_category = st.text_input("카테고리")
+        r_series = st.text_input("시리즈명")
+        r_product = st.text_input("제품명")
+        r_feature = st.text_input("특징")
+        r_code = st.text_input("코드번호")
+        r_color = st.text_input("컬러")
+        r_store = st.text_input("스마트스토어 상품번호")
+        r_inout = st.radio("입출고", ["입고", "출고"], horizontal=True)
+        r_qty = st.number_input("수량", min_value=1, step=1)
+        r_memo = st.text_input("메모")
+        submitted = st.form_submit_button("등록")
+
+        if submitted:
+            new_row = {
+                "id": int(st.session_state.next_id),
+                "날짜": r_date.strftime("%Y-%m-%d"),
+                "카테고리": r_category,
+                "시리즈명": r_series,
+                "제품명": r_product,
+                "특징": r_feature,
+                "코드": r_code,
+                "컬러": r_color,
+                "스마트스토어번호": r_store,
+                "입출고": r_inout,
+                "수량": r_qty if r_inout == "입고" else -r_qty,
+                "메모": r_memo
+            }
+            st.session_state.inventory_df = pd.concat([
+                st.session_state.inventory_df,
+                pd.DataFrame([new_row])
+            ], ignore_index=True)
+            st.session_state.next_id += 1
+            if st.session_state.autosave:
+                save_data(new_row)
+            st.success("제품이 등록되었습니다.")
 
 # 두 번째 탭: 재고 및 통계
 with tabs[1]:
@@ -106,6 +143,7 @@ with tabs[1]:
         st.subheader("📋 제품별 누적 재고 리스트")
         item_df = df.groupby(["시리즈명", "제품명", "컬러"]).agg({"수량": "sum"}).reset_index()
         item_df = item_df.rename(columns={"수량": "총재고"})
+        item_df["총재고"] = item_df["총재고"].astype(int)
         st.dataframe(item_df, use_container_width=True)
 
     else:
