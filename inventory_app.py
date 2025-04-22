@@ -123,7 +123,8 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("📦 현재 재고 현황")
     if not st.session_state.inventory_df.empty:
-        stock_df = st.session_state.inventory_df.groupby(["시리즈명", "제품명", "컬러", "스마트스토어번호"])["수량"].sum().reset_index()
+        # 날짜 포함된 재고 현황
+        stock_df = st.session_state.inventory_df.groupby(["날짜", "시리즈명", "제품명", "컬러", "스마트스토어번호"])["수량"].sum().reset_index()
         stock_df = stock_df.rename(columns={"수량": "재고"})
 
         def highlight_low_stock(val):
