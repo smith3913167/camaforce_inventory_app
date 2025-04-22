@@ -8,8 +8,8 @@ import os
 from supabase import create_client, Client
 
 # 🔐 Supabase 설정 (여기에 본인의 프로젝트 URL과 서비스 키 입력)
-SUPABASE_URL = https://ibotdnvtdlmmcrqtfsgx.supabase.co
-SUPABASE_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlib3RkbnZ0ZGxtbWNycXRmc2d4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NTIyNDk3MywiZXhwIjoyMDYwODAwOTczfQ.C2ndSZGaNTeEAdzKTb8X9hr19Rokqy8obqgb33oq0aE
+SUPABASE_URL = "https://ibotdnvtdlmmcrqtfsgx.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlib3RkbnZ0ZGxtbWNycXRmc2d4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NTIyNDk3MywiZXhwIjoyMDYwODAwOTczfQ.C2ndSZGaNTeEAdzKTb8X9hr19Rokqy8obqgb33oq0aE"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Supabase에서 데이터 불러오기
